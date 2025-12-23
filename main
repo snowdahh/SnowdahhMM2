@@ -1,5 +1,5 @@
--- Snowdahh Hub: MM2 Edition 
--- Basado en la estructura de SnowdahhHub v1.0.9 y lógica Rayfield MM2 [cite: 1, 11]
+-- Snowdahh Hub: MM2 Edition (Versión Corregida)
+-- Basado en la estructura de SnowdahhHub v1.0.9 y lógica Rayfield MM2
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -15,16 +15,16 @@ local playerGui = player:WaitForChild("PlayerGui")
 ----------------------------------------------------------------
 local AutofarmStarted = false
 local AutofarmIN = false
-local ResetWhenFullBag = false -- [cite: 6]
-local safespot = false -- [cite: 11]
-local autofarmspeed = 25 -- 
+local ResetWhenFullBag = false --
+local safespot = false --
+local autofarmspeed = 25 
 local CurrentCoinType = "SnowToken"
 
 local CoinCollectedEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("CoinCollected")
 local RoundStartEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("RoundStart")
 local RoundEndEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("RoundEndFade")
 
-function returncoincontaier() -- [cite: 11]
+function returncoincontaier() --
     for _, v in workspace:GetChildren() do
         if v:FindFirstChild("CoinContainer") and v:IsA("Model") then
             return v:FindFirstChild("CoinContainer")
@@ -33,7 +33,7 @@ function returncoincontaier() -- [cite: 11]
     return false
 end
 
-function FindNearestCoin(container) -- [cite: 7]
+function FindNearestCoin(container) --
     local coin = nil
     local magn = math.huge
     for _, v in pairs(container:GetChildren()) do
@@ -55,36 +55,46 @@ end
 -- Eventos de Juego
 CoinCollectedEvent.OnClientEvent:Connect(function(cointype, current, max)
     if cointype == CurrentCoinType and tonumber(current) == tonumber(max) then
-        AutofarmIN = false
-        if ResetWhenFullBag then player.Character.Humanoid.Health = 0 end -- [cite: 6]
-        if safespot then player.Character:MoveTo(workspace.Lobby.Lobby.Spawns:GetChildren()[9].Position) end -- [cite: 11]
+        AutofarmIN = false -- Detiene el movimiento al llenar mochila
+        if ResetWhenFullBag then player.Character.Humanoid.Health = 0 end --
+        if safespot then player.Character:MoveTo(workspace.Lobby.Lobby.Spawns:GetChildren()[9].Position) end --
     end
 end)
 
 RoundStartEvent.OnClientEvent:Connect(function() if AutofarmStarted then AutofarmIN = true end end)
 RoundEndEvent.OnClientEvent:Connect(function() AutofarmIN = false end)
 
--- Loop de Farm optimizado
+-- Loop de Farm optimizado (CORREGIDO: No se mueve en el Lobby)
 task.spawn(function()
     while task.wait() do
-        if AutofarmStarted and AutofarmIN and player.Character and returncoincontaier() then
-            local data = FindNearestCoin(returncoincontaier())
-            if data[1] then
-                local tween = TweenService:Create(player.Character.HumanoidRootPart, TweenInfo.new(data[2]/autofarmspeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(data[1].Position)})
-                tween:Play()
-                while data[1]:FindFirstChild("TouchInterest") and AutofarmStarted do task.wait() end
-                tween:Cancel()
+        -- Solo se ejecuta si el farm está activo Y la ronda ha empezado (AutofarmIN)
+        if AutofarmStarted and AutofarmIN and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local container = returncoincontaier()
+            if container then
+                local data = FindNearestCoin(container)
+                if data[1] then
+                    local tween = TweenService:Create(player.Character.HumanoidRootPart, TweenInfo.new(data[2]/autofarmspeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(data[1].Position)})
+                    tween:Play()
+                    
+                    -- Espera a recolectar o que cambie el estado
+                    while data[1] and data[1]:FindFirstChild("TouchInterest") and AutofarmStarted and AutofarmIN do 
+                        task.wait() 
+                    end
+                    tween:Cancel()
+                end
             end
         end
     end
 end)
 
 ----------------------------------------------------------------
--- INTERFAZ VISUAL "SNOWDAHH MM2"
+-- INTERFAZ VISUAL (CORREGIDA: ResetOnSpawn = false)
 ----------------------------------------------------------------
 if playerGui:FindFirstChild("SnowdahhMM2") then playerGui.SnowdahhMM2:Destroy() end
+
 local gui = Instance.new("ScreenGui", playerGui)
 gui.Name = "SnowdahhMM2"
+gui.ResetOnSpawn = false -- ESTO EVITA QUE EL GUI SE BORRE AL MORIR
 
 local main = Instance.new("Frame", gui)
 main.Size = UDim2.new(0, 450, 0, 320)
@@ -124,7 +134,7 @@ container.ScrollBarThickness = 0
 local layout = Instance.new("UIListLayout", container)
 layout.Padding = UDim.new(0, 8)
 
--- Función para crear Toggles Estilizados
+-- Función para crear Toggles
 local function createToggle(name, default, callback)
     local btn = Instance.new("TextButton", container)
     btn.Size = UDim2.new(1, 0, 0, 45)
@@ -165,20 +175,21 @@ local function createToggle(name, default, callback)
 end
 
 -- Agregar Elementos
-createToggle("Activar Auto Farm Monedas", false, function(v) -- [cite: 8]
+createToggle("Activar Auto Farm Monedas", false, function(v) --
     AutofarmStarted = v
-    AutofarmIN = v
+    -- Si el jugador ya está en partida al activar, encendemos el farm
+    if v and workspace:FindFirstChild("Normal") then AutofarmIN = true else AutofarmIN = false end
 end)
 
-createToggle("Resetear si Mochila está Llena", false, function(v) -- [cite: 6]
+createToggle("Resetear si Mochila está Llena", false, function(v) --
     ResetWhenFullBag = v
 end)
 
-createToggle("Teletransportar al Lobby (Lleno)", false, function(v) -- [cite: 11]
+createToggle("Teletransportar al Lobby (Lleno)", false, function(v) --
     safespot = v
 end)
 
--- Slider de Velocidad (Botón de ciclo)
+-- Slider de Velocidad
 local speedBtn = Instance.new("TextButton", container)
 speedBtn.Size = UDim2.new(1, 0, 0, 45)
 speedBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
@@ -188,16 +199,16 @@ speedBtn.Font = Enum.Font.GothamBold
 speedBtn.TextSize = 14
 Instance.new("UICorner", speedBtn).CornerRadius = UDim.new(0, 8)
 
-speedBtn.MouseButton1Click:Connect(function() -- 
+speedBtn.MouseButton1Click:Connect(function() 
     autofarmspeed = autofarmspeed + 5
     if autofarmspeed > 40 then autofarmspeed = 15 end
     speedBtn.Text = "Velocidad de Farm: " .. autofarmspeed
 end)
 
 -- Arrastre de Ventana
-local d, s, p
-main.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = true; s = i.Position; p = main.Position end end)
-UserInputService.InputChanged:Connect(function(i) if d and i.UserInputType == Enum.UserInputType.MouseMovement then 
-    local del = i.Position - s; main.Position = UDim2.new(p.X.Scale, p.X.Offset + del.X, p.Y.Scale, p.Y.Offset + del.Y) 
+local dragging, dragInput, dragStart, startPos
+main.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = i.Position; startPos = main.Position end end)
+UserInputService.InputChanged:Connect(function(i) if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then 
+    local delta = i.Position - dragStart; main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) 
 end end)
-UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
