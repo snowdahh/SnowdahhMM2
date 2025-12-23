@@ -1,0 +1,203 @@
+-- Snowdahh Hub: MM2 Edition 
+-- Basado en la estructura de SnowdahhHub v1.0.9 y lógica Rayfield MM2 [cite: 1, 11]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+----------------------------------------------------------------
+-- LÓGICA DE AUTO FARM MM2
+----------------------------------------------------------------
+local AutofarmStarted = false
+local AutofarmIN = false
+local ResetWhenFullBag = false -- [cite: 6]
+local safespot = false -- [cite: 11]
+local autofarmspeed = 25 -- 
+local CurrentCoinType = "SnowToken"
+
+local CoinCollectedEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("CoinCollected")
+local RoundStartEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("RoundStart")
+local RoundEndEvent = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("RoundEndFade")
+
+function returncoincontaier() -- [cite: 11]
+    for _, v in workspace:GetChildren() do
+        if v:FindFirstChild("CoinContainer") and v:IsA("Model") then
+            return v:FindFirstChild("CoinContainer")
+        end
+    end
+    return false
+end
+
+function FindNearestCoin(container) -- [cite: 7]
+    local coin = nil
+    local magn = math.huge
+    for _, v in pairs(container:GetChildren()) do
+        if v:FindFirstChild("CoinVisual") then
+            if v:GetAttribute("CoinID") == CurrentCoinType and v:FindFirstChild("TouchInterest") then
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    local dist = (player.Character.HumanoidRootPart.Position - v.Position).Magnitude
+                    if dist < magn then
+                        coin = v
+                        magn = dist
+                    end
+                end
+            end
+        end
+    end
+    return {coin, magn}
+end
+
+-- Eventos de Juego
+CoinCollectedEvent.OnClientEvent:Connect(function(cointype, current, max)
+    if cointype == CurrentCoinType and tonumber(current) == tonumber(max) then
+        AutofarmIN = false
+        if ResetWhenFullBag then player.Character.Humanoid.Health = 0 end -- [cite: 6]
+        if safespot then player.Character:MoveTo(workspace.Lobby.Lobby.Spawns:GetChildren()[9].Position) end -- [cite: 11]
+    end
+end)
+
+RoundStartEvent.OnClientEvent:Connect(function() if AutofarmStarted then AutofarmIN = true end end)
+RoundEndEvent.OnClientEvent:Connect(function() AutofarmIN = false end)
+
+-- Loop de Farm optimizado
+task.spawn(function()
+    while task.wait() do
+        if AutofarmStarted and AutofarmIN and player.Character and returncoincontaier() then
+            local data = FindNearestCoin(returncoincontaier())
+            if data[1] then
+                local tween = TweenService:Create(player.Character.HumanoidRootPart, TweenInfo.new(data[2]/autofarmspeed, Enum.EasingStyle.Linear), {CFrame = CFrame.new(data[1].Position)})
+                tween:Play()
+                while data[1]:FindFirstChild("TouchInterest") and AutofarmStarted do task.wait() end
+                tween:Cancel()
+            end
+        end
+    end
+end)
+
+----------------------------------------------------------------
+-- INTERFAZ VISUAL "SNOWDAHH MM2"
+----------------------------------------------------------------
+if playerGui:FindFirstChild("SnowdahhMM2") then playerGui.SnowdahhMM2:Destroy() end
+local gui = Instance.new("ScreenGui", playerGui)
+gui.Name = "SnowdahhMM2"
+
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 450, 0, 320)
+main.Position = UDim2.new(0.5, -225, 0.5, -160)
+main.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+main.BorderSizePixel = 0
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+
+local stroke = Instance.new("UIStroke", main)
+stroke.Color = Color3.fromRGB(0, 190, 255)
+stroke.Thickness = 2
+
+-- Header
+local header = Instance.new("Frame", main)
+header.Size = UDim2.new(1, 0, 0, 45)
+header.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+header.BorderSizePixel = 0
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
+
+local title = Instance.new("TextLabel", header)
+title.Text = "SNOWDAHH <font color='#00BEFF'>MM2</font>"
+title.RichText = true
+title.Size = UDim2.new(1, -20, 1, 0)
+title.Position = UDim2.new(0, 15, 0, 0)
+title.TextColor3 = Color3.new(1,1,1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.BackgroundTransparency = 1
+
+-- Contenedor de Opciones
+local container = Instance.new("ScrollingFrame", main)
+container.Size = UDim2.new(1, -30, 1, -70)
+container.Position = UDim2.new(0, 15, 0, 60)
+container.BackgroundTransparency = 1
+container.ScrollBarThickness = 0
+local layout = Instance.new("UIListLayout", container)
+layout.Padding = UDim.new(0, 8)
+
+-- Función para crear Toggles Estilizados
+local function createToggle(name, default, callback)
+    local btn = Instance.new("TextButton", container)
+    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    
+    local txt = Instance.new("TextLabel", btn)
+    txt.Size = UDim2.new(1, -60, 1, 0)
+    txt.Position = UDim2.new(0, 15, 0, 0)
+    txt.Text = name
+    txt.TextColor3 = Color3.fromRGB(200, 200, 200)
+    txt.Font = Enum.Font.GothamSemibold
+    txt.TextSize = 14
+    txt.TextXAlignment = Enum.TextXAlignment.Left
+    txt.BackgroundTransparency = 1
+    
+    local indicator = Instance.new("Frame", btn)
+    indicator.Size = UDim2.new(0, 40, 0, 20)
+    indicator.Position = UDim2.new(1, -55, 0.5, -10)
+    indicator.BackgroundColor3 = default and Color3.fromRGB(0, 190, 255) or Color3.fromRGB(60, 60, 65)
+    Instance.new("UICorner", indicator).CornerRadius = UDim.new(1, 0)
+    
+    local dot = Instance.new("Frame", indicator)
+    dot.Size = UDim2.new(0, 16, 0, 16)
+    dot.Position = default and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)
+    dot.BackgroundColor3 = Color3.new(1,1,1)
+    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+    
+    local active = default
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        TweenService:Create(indicator, TweenInfo.new(0.3), {BackgroundColor3 = active and Color3.fromRGB(0, 190, 255) or Color3.fromRGB(60, 60, 65)}):Play()
+        TweenService:Create(dot, TweenInfo.new(0.3), {Position = active and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}):Play()
+        callback(active)
+    end)
+end
+
+-- Agregar Elementos
+createToggle("Activar Auto Farm Monedas", false, function(v) -- [cite: 8]
+    AutofarmStarted = v
+    AutofarmIN = v
+end)
+
+createToggle("Resetear si Mochila está Llena", false, function(v) -- [cite: 6]
+    ResetWhenFullBag = v
+end)
+
+createToggle("Teletransportar al Lobby (Lleno)", false, function(v) -- [cite: 11]
+    safespot = v
+end)
+
+-- Slider de Velocidad (Botón de ciclo)
+local speedBtn = Instance.new("TextButton", container)
+speedBtn.Size = UDim2.new(1, 0, 0, 45)
+speedBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+speedBtn.Text = "Velocidad de Farm: " .. autofarmspeed
+speedBtn.TextColor3 = Color3.fromRGB(0, 190, 255)
+speedBtn.Font = Enum.Font.GothamBold
+speedBtn.TextSize = 14
+Instance.new("UICorner", speedBtn).CornerRadius = UDim.new(0, 8)
+
+speedBtn.MouseButton1Click:Connect(function() -- 
+    autofarmspeed = autofarmspeed + 5
+    if autofarmspeed > 40 then autofarmspeed = 15 end
+    speedBtn.Text = "Velocidad de Farm: " .. autofarmspeed
+end)
+
+-- Arrastre de Ventana
+local d, s, p
+main.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = true; s = i.Position; p = main.Position end end)
+UserInputService.InputChanged:Connect(function(i) if d and i.UserInputType == Enum.UserInputType.MouseMovement then 
+    local del = i.Position - s; main.Position = UDim2.new(p.X.Scale, p.X.Offset + del.X, p.Y.Scale, p.Y.Offset + del.Y) 
+end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then d = false end end)
